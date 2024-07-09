@@ -26,14 +26,14 @@ class ASN1Decoder {
     for (let i = 0; i < length; i++) {
       value = (value << 8) | this.data[this.pos++];
     }
-    return value;
+    return { integer: value };
   }
 
   readOctetString() {
     let length = this.readLength();
     let value = this.data.slice(this.pos, this.pos + length);
     this.pos += length;
-    return value;
+    return { pkey: value };
   }
 
   readBitString() {
@@ -41,7 +41,7 @@ class ASN1Decoder {
     let unusedBits = this.data[this.pos++]; // First byte indicates the number of unused bits
     let value = this.data.slice(this.pos, this.pos + length - 1);
     this.pos += length - 1;
-    return { unusedBits, value };
+    return { unusedBits, pubkey: value };
   }
 
   readObjectIdentifier() {
@@ -64,13 +64,14 @@ class ASN1Decoder {
       }
     }
 
-    return oid.join(".");
+    let oidStr = oid.join(".");
+    return { oid: oidStr }; // Return OID as a string
   }
 
   readSequence() {
     let length = this.readLength();
     let endPos = this.pos + length;
-    let items = [];
+    let items = []; // this would better be map or obj
     while (this.pos < endPos) {
       items.push(this.read());
     }
@@ -90,16 +91,10 @@ class ASN1Decoder {
         return this.readObjectIdentifier();
       case 0x30: // SEQUENCE
         return this.readSequence();
-      case 0xa0: {
-        // NODE with OBJECT IDENTIFIER
-        this.pos += 1;
-        break;
-      }
-      case 0xa1: {
-        // NODE with BIT STRING
-        this.pos += 1;
-        break;
-      }
+      case 0xa0: // NODE TAG COULD BE TREATED AS SEQUENCE
+        return this.readSequence();
+      case 0xa1: // NODE TAG COULD BE TREATED AS SEQUENCE
+        return this.readSequence();
       default:
         throw new Error("Unsupported type: " + type);
     }
@@ -107,8 +102,6 @@ class ASN1Decoder {
 }
 
 // Example usage:
-// https://www.notion.so/limechain/SDK-Key-Compatibility-2ae75c51079d451aa296b72f7a5ec33a
-// Data tested is defined from the compatibility section in sdk reference
 const data1 = Uint8Array.from(
   Buffer.from(
     "302e020100300506032b657004220420feb858a4a69600a5eef2d9c76f7fb84fc0b6627f29e0ab17e160f640c267d404",
