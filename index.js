@@ -1,102 +1,218 @@
 class ASN1Decoder {
-    constructor(data) {
-        this.data = new Uint8Array(data);
-        this.pos = 0;
+  constructor(data) {
+    this.data = new Uint8Array(data);
+    this.pos = 0;
+  }
+
+  readLength() {
+    let length = this.data[this.pos++];
+    if (length & 0x80) {
+      let numBytes = length & 0x7f;
+      length = 0;
+      for (let i = 0; i < numBytes; i++) {
+        length = (length << 8) | this.data[this.pos++];
+      }
+    }
+    return length;
+  }
+
+  readType() {
+    return this.data[this.pos++];
+  }
+
+  readInteger() {
+    let length = this.readLength();
+    let value = 0;
+    for (let i = 0; i < length; i++) {
+      value = (value << 8) | this.data[this.pos++];
+    }
+    return value;
+  }
+
+  readOctetString() {
+    let length = this.readLength();
+    let value = this.data.slice(this.pos, this.pos + length);
+    this.pos += length;
+    return value;
+  }
+
+  readBitString() {
+    let length = this.readLength();
+    let unusedBits = this.data[this.pos++]; // First byte indicates the number of unused bits
+    let value = this.data.slice(this.pos, this.pos + length - 1);
+    this.pos += length - 1;
+    return { unusedBits, value };
+  }
+
+  readObjectIdentifier() {
+    let length = this.readLength();
+    let endPos = this.pos + length;
+    let oid = [];
+    let value = 0;
+
+    // The first byte contains the first two components
+    let firstByte = this.data[this.pos++];
+    oid.push(Math.floor(firstByte / 40));
+    oid.push(firstByte % 40);
+
+    while (this.pos < endPos) {
+      let byte = this.data[this.pos++];
+      value = (value << 7) | (byte & 0x7f);
+      if (!(byte & 0x80)) {
+        oid.push(value);
+        value = 0;
+      }
     }
 
-    readLength() {
-        let length = this.data[this.pos++];
-        if (length & 0x80) {
-            let numBytes = length & 0x7F;
-            length = 0;
-            for (let i = 0; i < numBytes; i++) {
-                length = (length << 8) | this.data[this.pos++];
-            }
-        }
-        return length;
+    return oid.join(".");
+  }
+
+  readSequence() {
+    let length = this.readLength();
+    let endPos = this.pos + length;
+    let items = [];
+    while (this.pos < endPos) {
+      items.push(this.read());
     }
+    return items;
+  }
 
-    readType() {
-        return this.data[this.pos++];
+  read() {
+    let type = this.readType();
+    switch (type) {
+      case 0x02: // INTEGER
+        return this.readInteger();
+      case 0x03: // BIT STRING FOR PUBKEY
+        return this.readBitString();
+      case 0x04: // OCTET STRING FOR PKEY
+        return this.readOctetString();
+      case 0x06: // OBJECT IDENTIFIER FOR CURVE TYPE
+        return this.readObjectIdentifier();
+      case 0x30: // SEQUENCE
+        return this.readSequence();
+      case 0xa0: {
+        // NODE with OBJECT IDENTIFIER
+        this.pos += 1;
+        break;
+      }
+      case 0xa1: {
+        // NODE with BIT STRING
+        this.pos += 1;
+        break;
+      }
+      default:
+        throw new Error("Unsupported type: " + type);
     }
-
-    readInteger() {
-        let length = this.readLength();
-        let value = 0;
-        for (let i = 0; i < length; i++) {
-            value = (value << 8) | this.data[this.pos++];
-        }
-        return value;
-    }
-
-    readOctetString() {
-        let length = this.readLength();
-        let value = this.data.slice(this.pos, this.pos + length);
-        this.pos += length;
-        return value;
-    }
-
-    readObjectIdentifier() {
-        let length = this.readLength();
-        let endPos = this.pos + length;
-        let oid = [];
-        let value = 0;
-
-        // The first byte contains the first two components
-        let firstByte = this.data[this.pos++];
-        oid.push(Math.floor(firstByte / 40));
-        oid.push(firstByte % 40);
-
-        while (this.pos < endPos) {
-            let byte = this.data[this.pos++];
-            value = (value << 7) | (byte & 0x7F);
-            if (!(byte & 0x80)) {
-                oid.push(value);
-                value = 0;
-            }
-        }
-
-        return oid.join('.');
-    }
-
-    readSequence() {
-        let length = this.readLength();
-        let endPos = this.pos + length;
-        let items = [];
-        while (this.pos < endPos) {
-            items.push(this.read());
-        }
-        return items;
-    }
-
-    read() {
-        let type = this.readType();
-        switch (type) {
-            case 0x02: // INTEGER
-                return this.readInteger();
-            case 0x04: // OCTET STRING
-                return this.readOctetString();
-            case 0x06: // OBJECT IDENTIFIER
-                return this.readObjectIdentifier();
-            case 0x30: // SEQUENCE
-                return this.readSequence();
-            default:
-                throw new Error("Unsupported type: " + type);
-        }
-    }
+  }
 }
 
 // Example usage:
+// https://www.notion.so/limechain/SDK-Key-Compatibility-2ae75c51079d451aa296b72f7a5ec33a
+// Data tested is defined from the compatibility section in sdk reference
+const data1 = Uint8Array.from(
+  Buffer.from(
+    "302e020100300506032b657004220420feb858a4a69600a5eef2d9c76f7fb84fc0b6627f29e0ab17e160f640c267d404",
+    "hex"
+  )
+);
 
-// Sample DER-encoded data for a sequence containing an integer, an object identifier, and an octet string
-const data = new Uint8Array([
-    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70,
-    0x04, 0x22, 0x04, 0x20, 0xfe, 0xb8, 0x58, 0xa4, 0xa6, 0x96, 0x00, 0xa5,
-    0xee, 0xf2, 0xd9, 0xc7, 0x6f, 0x7f, 0xb8, 0x4f, 0xc0, 0xb6, 0x62, 0x7f,
-    0x29, 0xe0, 0xab, 0x17, 0xe1, 0x60, 0xf6, 0x40, 0xc2, 0x67, 0xd4, 0x04
-]);
+let decoder = new ASN1Decoder(data1);
+let result = decoder.read();
 
-const decoder = new ASN1Decoder(data);
-const result = decoder.read();
+console.log(result);
+
+const data2 = Uint8Array.from(
+  Buffer.from(
+    "302a300506032b65700321008ccd31b53d1835b467aac795dab19b274dd3b37e3daf12fcec6bc02bac87b53d",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data2);
+result = decoder.read();
+
+console.log(result);
+
+const data3 = Uint8Array.from(
+  Buffer.from(
+    "3030020100300706052b8104000a042204208c2cdc9575fe67493443967d74958fd7808a3787fd3337e99cfeebbc7566b586",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data3);
+result = decoder.read();
+
+console.log(result);
+
+const data4 = Uint8Array.from(
+  Buffer.from(
+    "302d300706052b8104000a032200028173079d2e996ef6b2d064fc82d5fc7094367211e28422bec50a2f75c365f5fd",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data4);
+result = decoder.read();
+
+console.log(result);
+
+const data5 = Uint8Array.from(
+  Buffer.from(
+    "30540201010420ac318ea8ff8d991ab2f16172b4738e74dc35a56681199cfb1c0cb2e7cb560ffda00706052b8104000aa124032200036843f5cb338bbb4cdb21b0da4ea739d910951d6e8a5f703d313efe31afe788f4",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data5);
+result = decoder.read();
+
+console.log(result);
+
+const data6 = Uint8Array.from(
+  Buffer.from(
+    "3036301006072a8648ce3d020106052b8104000a032200036843f5cb338bbb4cdb21b0da4ea739d910951d6e8a5f703d313efe31afe788f4",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data6);
+result = decoder.read();
+
+console.log(result);
+
+const data7 = Uint8Array.from(
+  Buffer.from(
+    "307402010104208927647ad12b29646a1d051da8453462937bb2c813c6815cac6c0b720526ffc6a00706052b8104000aa14403420004aaac1c3ac1bea0245b8e00ce1e2018f9eab61b6331fbef7266f2287750a6597795f855ddcad2377e22259d1fcb4e0f1d35e8f2056300c15070bcbfce3759cc9d",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data7);
+result = decoder.read();
+
+console.log(result);
+
+const data8 = Uint8Array.from(
+  Buffer.from(
+    "3056301006072a8648ce3d020106052b8104000a03420004aaac1c3ac1bea0245b8e00ce1e2018f9eab61b6331fbef7266f2287750a6597795f855ddcad2377e22259d1fcb4e0f1d35e8f2056300c15070bcbfce3759cc9d",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data8);
+result = decoder.read();
+
+console.log(result);
+
+const data9 = Uint8Array.from(
+  Buffer.from(
+    "302e0201010420a6170a6aa6389a5bd3a3a8f9375f57bd91aa7f7d8b8b46ce0b702e000a21a5fea00706052b8104000a",
+    "hex"
+  )
+);
+
+decoder = new ASN1Decoder(data9);
+result = decoder.read();
 
 console.log(result);
