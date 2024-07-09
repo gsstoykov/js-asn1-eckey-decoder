@@ -2,6 +2,12 @@ class ASN1Decoder {
   constructor(data) {
     this.data = new Uint8Array(data);
     this.pos = 0;
+    this.oids = [];
+    this.oidMap = {
+      "1.3.132.0.10": "ecdsa",
+      "1.3.101.112": "ed25519",
+      "1.2.840.10045.2.1": "pubkey",
+    };
   }
 
   readLength() {
@@ -65,7 +71,16 @@ class ASN1Decoder {
     }
 
     let oidStr = oid.join(".");
+    this.oids.push(oidStr);
     return { oid: oidStr }; // Return OID as a string
+  }
+
+  getOids() {
+    return this.oids;
+  }
+
+  getOidKeyTypes() {
+    return this.oids.map((oid) => this.oidMap[oid] || "unknown");
   }
 
   readSequence() {
@@ -112,7 +127,9 @@ const data1 = Uint8Array.from(
 let decoder = new ASN1Decoder(data1);
 let result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data2 = Uint8Array.from(
   Buffer.from(
@@ -124,7 +141,9 @@ const data2 = Uint8Array.from(
 decoder = new ASN1Decoder(data2);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data3 = Uint8Array.from(
   Buffer.from(
@@ -136,7 +155,9 @@ const data3 = Uint8Array.from(
 decoder = new ASN1Decoder(data3);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data4 = Uint8Array.from(
   Buffer.from(
@@ -148,7 +169,9 @@ const data4 = Uint8Array.from(
 decoder = new ASN1Decoder(data4);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data5 = Uint8Array.from(
   Buffer.from(
@@ -160,7 +183,9 @@ const data5 = Uint8Array.from(
 decoder = new ASN1Decoder(data5);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data6 = Uint8Array.from(
   Buffer.from(
@@ -172,7 +197,9 @@ const data6 = Uint8Array.from(
 decoder = new ASN1Decoder(data6);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data7 = Uint8Array.from(
   Buffer.from(
@@ -184,7 +211,9 @@ const data7 = Uint8Array.from(
 decoder = new ASN1Decoder(data7);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data8 = Uint8Array.from(
   Buffer.from(
@@ -196,7 +225,9 @@ const data8 = Uint8Array.from(
 decoder = new ASN1Decoder(data8);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
 
 const data9 = Uint8Array.from(
   Buffer.from(
@@ -208,4 +239,6 @@ const data9 = Uint8Array.from(
 decoder = new ASN1Decoder(data9);
 result = decoder.read();
 
-console.log(result);
+console.log("Full ASN1 decode: \n", result, "\n");
+console.log("Decoded oids: \n", decoder.getOids(), "\n");
+console.log("Oid key types: \n", decoder.getOidKeyTypes(), "\n");
